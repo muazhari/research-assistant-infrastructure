@@ -1,0 +1,155 @@
+services:
+  nginx-one:
+    image: nginx:latest
+    ports:
+      - '${GATEWAY_FRONTEND_PORT}:${GATEWAY_FRONTEND_PORT}'
+      - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
+      - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
+      - '${GATEWAY_COCKROACH_NODE_PORT}:${GATEWAY_COCKROACH_NODE_PORT}'
+      - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
+      - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
+      - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
+    volumes:
+      - ./nginx/template.nginx.conf:/etc/nginx/template.nginx.conf
+    env_file:
+      - "./.env"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        envsubst < /etc/nginx/template.nginx.conf > /etc/nginx/nginx.conf \
+        && \
+        nginx -t \
+        && \
+        nginx -g "daemon off;"
+    healthcheck:
+      test: service nginx status || exit 1
+    depends_on:
+      #      - frontend
+      #      - backend
+      - redis-one
+      - milvus-one
+      - cockroach-one
+  cockroach-init:
+    image: cockroachdb/cockroach:latest
+    deploy:
+      replicas: 1
+    volumes:
+      - "./cockroach/migration:/docker-entrypoint-initdb.d"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        cockroach init --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_NODE_PORT} --insecure \
+        && \
+        cockroach sql --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
+        --execute="CREATE ROLE IF NOT EXISTS \"${GATEWAY_COCKROACH_USER}\" WITH LOGIN;" \
+        --execute="CREATE DATABASE IF NOT EXISTS \"${GATEWAY_COCKROACH_DATABASE}\";" \
+        --execute="GRANT ALL ON DATABASE \"${GATEWAY_COCKROACH_DATABASE}\" TO \"${GATEWAY_COCKROACH_USER}\";" \
+        --execute="\c ${GATEWAY_COCKROACH_DATABASE};" \
+        --execute="ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO \"${GATEWAY_COCKROACH_USER}\";" \
+        --execute="ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO \"${GATEWAY_COCKROACH_USER}\";" \
+        && \
+        cockroach sql --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
+        --database=${GATEWAY_COCKROACH_DATABASE} \
+        --file=/docker-entrypoint-initdb.d/init.sql
+    depends_on:
+      - nginx-one
+  #  frontend:
+  #    image: research-assistant-frontend:latest
+  #    hostname: ${GATEWAY_FRONTEND_HOST}
+  #    entrypoint: [ "/bin/sh", "-c" ]
+  #    command:
+  #      - |
+  #        python3 run.py
+  #    healthcheck:
+  #      test: netstat -tln | grep ${GATEWAY_FRONTEND_PORT} || exit 1
+  #  backend:
+  #    image: research-assistant-backend:latest
+  #    hostname: ${GATEWAY_BACKEND_HOST}
+  #    entrypoint: [ "/bin/sh", "-c" ]
+  #    command:
+  #      - |
+  #        python3 run.py
+  #    healthcheck:
+  #      test: netstat -tln | grep ${GATEWAY_BACKEND_PORT} || exit 1
+  #    deploy:
+  #      resources:
+  #        reservations:
+  #          devices:
+  #            - driver: nvidia
+  #              capabilities: [ "gpu" ]
+  #              device_ids: [ "0" ]
+  redis-one:
+    image: redis:latest
+    hostname: ${REDIS_ONE_HOST}
+    volumes:
+      - ./redis/data:/data
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        redis-server \
+        --requirepass ${REDIS_ONE_PASSWORD} \
+        --cluster-enabled yes \
+        --cluster-config-file nodes.conf \
+        --cluster-node-timeout 5000
+  cockroach-one:
+    image: cockroachdb/cockroach:latest
+    hostname: ${COCKROACH_ONE_HOST}
+    volumes:
+      - ./cockroach/data:/cockroach/cockroach-data
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        cockroach start \
+        --advertise-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT} \
+        --http-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_HTTP_PORT} \
+        --listen-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT} \
+        --sql-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_SQL_PORT} \
+        --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT} \
+        --insecure
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health?ready=1" ]
+  etcd-one:
+    image: quay.io/coreos/etcd:latest
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./etcd/data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
+  minio-one:
+    container_name: milvus-minio
+    image: minio/minio:latest
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ./minio/data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+  milvus-one:
+    image: milvusdb/milvus:latest-gpu
+    hostname: ${MILVUS_ONE_HOST}
+    command: milvus run standalone
+    environment:
+      - ETCD_ENDPOINTS=etcd-one:2379
+      - MINIO_ADDRESS=minio-one:9000
+    volumes:
+      - ./milvus/data:/var/lib/milvus
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ "gpu" ]
+              device_ids: [ "0" ]
+    depends_on:
+      - etcd-one
+      - minio-one
