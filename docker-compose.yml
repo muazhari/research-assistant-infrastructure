@@ -82,7 +82,7 @@ services:
     image: redis:latest
     hostname: ${REDIS_ONE_HOST}
     volumes:
-      - ./redis/data:/data
+      - ./redis/one/data:/data
     entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
@@ -95,7 +95,7 @@ services:
     image: cockroachdb/cockroach:latest
     hostname: ${COCKROACH_ONE_HOST}
     volumes:
-      - ./cockroach/data:/cockroach/cockroach-data
+      - ./cockroach/one/data:/cockroach/cockroach-data
     entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
@@ -116,7 +116,7 @@ services:
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
     volumes:
-      - ./etcd/data:/etcd
+      - ./etcd/one/data:/etcd
     command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: [ "CMD", "etcdctl", "endpoint", "health" ]
@@ -130,7 +130,7 @@ services:
       - "9001:9001"
       - "9000:9000"
     volumes:
-      - ./minio/data:/minio_data
+      - ./minio/one/data:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
@@ -142,7 +142,7 @@ services:
       - ETCD_ENDPOINTS=etcd-one:2379
       - MINIO_ADDRESS=minio-one:9000
     volumes:
-      - ./milvus/data:/var/lib/milvus
+      - ./milvus/one/data:/var/lib/milvus
     deploy:
       resources:
         reservations:
