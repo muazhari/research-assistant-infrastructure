@@ -43,7 +43,8 @@ create table document_process
     initial_document_id uuid        not null references document (id) on delete cascade on update cascade,
     final_document_id   uuid        not null references document (id) on delete cascade on update cascade,
     started_at          timestamptz not null,
-    finished_at         timestamptz not null
+    finished_at         timestamptz not null,
+    constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id)
 );
 
 
@@ -54,7 +55,7 @@ create table file_document
     file_name      text             not null,
     file_extension text             not null,
     file_data      bytea            not null,
-    file_data_hash text            not null
+    file_data_hash text             not null
 );
 
 drop table if exists web_document cascade;
@@ -62,7 +63,7 @@ create table web_document
 (
     id           uuid primary key not null references document (id) on delete cascade on update cascade,
     web_url      text             not null,
-    web_url_hash text            not null
+    web_url_hash text             not null
 );
 
 drop table if exists text_document cascade;
@@ -70,7 +71,7 @@ create table text_document
 (
     id                uuid primary key not null references document (id) on delete cascade on update cascade,
     text_content      text             not null,
-    text_content_hash text            not null
+    text_content_hash text             not null
 );
 --
 -- -- populate all table accounts
