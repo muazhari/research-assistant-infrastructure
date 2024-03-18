@@ -44,8 +44,9 @@ create table document_process
     final_document_id   uuid unique not null references document (id) on delete cascade on update cascade,
     started_at          timestamptz not null,
     finished_at         timestamptz not null,
-    constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id)
-);
+    constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id
+)
+    );
 
 
 drop table if exists file_document cascade;
