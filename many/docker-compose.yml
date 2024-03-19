@@ -8,16 +8,14 @@ services:
       - '${GATEWAY_FRONTEND_PORT}:${GATEWAY_FRONTEND_PORT}'
       - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
       - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
-      - '${GATEWAY_COCKROACH_NODE_PORT}:${GATEWAY_COCKROACH_NODE_PORT}'
       - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
-      - '${GATEWAY_ETCD_CLIENT_PORT}:${GATEWAY_ETCD_CLIENT_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
-      - ./nginx/one.template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]
@@ -48,7 +46,7 @@ services:
       replicas: 1
     volumes:
       - ./nginx/two/data:/etc/nginx
-      - ./nginx/two.template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]
@@ -95,9 +93,9 @@ services:
     entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |-
-        cockroach init --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_NODE_PORT} --insecure \
+        cockroach init --host=${NGINX_TWO_HOST}:${GATEWAY_COCKROACH_NODE_PORT} --insecure \
         && \
-        cockroach sql --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
+        cockroach sql --host=${NGINX_TWO_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
         --execute="CREATE ROLE IF NOT EXISTS \"${GATEWAY_COCKROACH_USER}\" WITH LOGIN;" \
         --execute="CREATE DATABASE IF NOT EXISTS \"${GATEWAY_COCKROACH_DATABASE}\";" \
         --execute="GRANT ALL ON DATABASE \"${GATEWAY_COCKROACH_DATABASE}\" TO \"${GATEWAY_COCKROACH_USER}\";" \
@@ -105,7 +103,7 @@ services:
         --execute="ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO \"${GATEWAY_COCKROACH_USER}\";" \
         --execute="ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO \"${GATEWAY_COCKROACH_USER}\";" \
         && \
-        cockroach sql --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
+        cockroach sql --host=${NGINX_TWO_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
         --database=${GATEWAY_COCKROACH_DATABASE} \
         --file=/docker-entrypoint-initdb.d/init.sql
     depends_on:
