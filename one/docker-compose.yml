@@ -1,0 +1,254 @@
+services:
+  nginx-one:
+    image: nginx:latest
+    hostname: ${NGINX_ONE_HOST}
+    deploy:
+      replicas: 1
+    ports:
+      - '${GATEWAY_FRONTEND_PORT}:${GATEWAY_FRONTEND_PORT}'
+      - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
+      - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
+      - '${GATEWAY_COCKROACH_NODE_PORT}:${GATEWAY_COCKROACH_NODE_PORT}'
+      - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
+      - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
+      - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
+      - '${GATEWAY_ETCD_CLIENT_PORT}:${GATEWAY_ETCD_CLIENT_PORT}'
+      - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
+      - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
+    volumes:
+      - ./nginx/one/data:/etc/nginx
+      - ./nginx/one.template.nginx.conf:/etc/nginx/template.nginx.conf
+    env_file:
+      - "./.env"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |-
+        envsubst < /etc/nginx/template.nginx.conf > /etc/nginx/nginx.conf \
+        && \
+        nginx -t \
+        && \
+        nginx -g "daemon off;"
+    healthcheck:
+      test: service nginx status || exit 1
+    depends_on:
+      #      - frontend
+      #      - backend
+      - redis-one
+      - cockroach-one
+      - milvus-standalone
+      - nginx-two
+  nginx-two:
+    image: nginx:latest
+    hostname: ${NGINX_TWO_HOST}
+    deploy:
+      replicas: 1
+    volumes:
+      - ./nginx/two/data:/etc/nginx
+      - ./nginx/two.template.nginx.conf:/etc/nginx/template.nginx.conf
+    env_file:
+      - "./.env"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |-
+        envsubst < /etc/nginx/template.nginx.conf > /etc/nginx/nginx.conf \
+        && \
+        nginx -t \
+        && \
+        nginx -g "daemon off;"
+    healthcheck:
+      test: service nginx status || exit 1
+    depends_on:
+      - etcd-one
+      - minio-one
+  redis-init:
+    image: redis:latest
+    deploy:
+      replicas: 1
+    entrypoint: [ "redis-cli" ]
+    command:
+      - --pass
+      - ${GATEWAY_REDIS_PASSWORD}
+      - --cluster
+      - create
+      - ${REDIS_ONE_HOST}:${REDIS_ONE_PORT}
+      - --cluster-replicas
+      - "0"
+      - --cluster-yes
+    depends_on:
+      - nginx-one
+  cockroach-init:
+    image: cockroachdb/cockroach:latest
+    deploy:
+      replicas: 1
+    volumes:
+      - "../migration/cockroach:/docker-entrypoint-initdb.d"
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |-
+        cockroach init --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_NODE_PORT} --insecure \
+        && \
+        cockroach sql --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
+        --execute="CREATE ROLE IF NOT EXISTS \"${GATEWAY_COCKROACH_USER}\" WITH LOGIN;" \
+        --execute="CREATE DATABASE IF NOT EXISTS \"${GATEWAY_COCKROACH_DATABASE}\";" \
+        --execute="GRANT ALL ON DATABASE \"${GATEWAY_COCKROACH_DATABASE}\" TO \"${GATEWAY_COCKROACH_USER}\";" \
+        --execute="\c ${GATEWAY_COCKROACH_DATABASE};" \
+        --execute="ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO \"${GATEWAY_COCKROACH_USER}\";" \
+        --execute="ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO \"${GATEWAY_COCKROACH_USER}\";" \
+        && \
+        cockroach sql --host=${GATEWAY_HOST}:${GATEWAY_COCKROACH_SQL_PORT} --insecure \
+        --database=${GATEWAY_COCKROACH_DATABASE} \
+        --file=/docker-entrypoint-initdb.d/init.sql
+    depends_on:
+      - nginx-one
+  #  frontend:
+  #    image: research-assistant-frontend:latest
+  #    deploy:
+  #      replicas: 3
+  #    hostname: ${GATEWAY_FRONTEND_HOST}
+  #    entrypoint: [ "/bin/sh", "-c" ]
+  #    command:
+  #      - |-
+  #        python3 run.py
+  #    healthcheck:
+  #      test: netstat -tln | grep ${GATEWAY_FRONTEND_PORT} || exit 1
+  #  backend:
+  #    image: research-assistant-backend:latest
+  #    hostname: ${GATEWAY_BACKEND_HOST}
+  #    entrypoint: [ "/bin/sh", "-c" ]
+  #    command:
+  #      - |-
+  #        python3 run.py
+  #    healthcheck:
+  #      test: netstat -tln | grep ${GATEWAY_BACKEND_PORT} || exit 1
+  #    deploy:
+  #      replicas: 1
+  #      resources:
+  #        reservations:
+  #          devices:
+  #            - driver: nvidia
+  #              capabilities: [ "gpu" ]
+  #              device_ids: [ "0" ]
+  redis-one:
+    image: redis:latest
+    deploy:
+      replicas: 1
+    hostname: ${REDIS_ONE_HOST}
+    volumes:
+      - ./redis/one/data:/data
+    entrypoint: [ "redis-server" ]
+    command:
+      - --port
+      - ${REDIS_ONE_PORT}
+      - --requirepass
+      - ${REDIS_ONE_PASSWORD}
+      - --cluster-enabled yes
+      - --cluster-config-file nodes.conf
+      - --cluster-node-timeout 5000
+  redis-insight-one:
+    image: oblakstudio/redisinsight:latest
+    deploy:
+      replicas: 1
+    hostname: ${REDIS_INSIGHT_ONE_HOST}
+    volumes:
+      - ./redis-insight/one/data:/db
+  cockroach-one:
+    image: cockroachdb/cockroach:latest
+    deploy:
+      replicas: 1
+    hostname: ${COCKROACH_ONE_HOST}
+    volumes:
+      - ./cockroach/one/data:/cockroach/cockroach-data
+    entrypoint: [ "cockroach" ]
+    command:
+      - start
+      - --advertise-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT}
+      - --http-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_HTTP_PORT}
+      - --listen-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT}
+      - --sql-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_SQL_PORT}
+      - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT}
+      - --insecure
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_ONE_HTTP_PORT}/health?ready=1" ]
+  etcd-one:
+    image: quay.io/coreos/etcd:latest
+    deploy:
+      replicas: 1
+    hostname: ${ETCD_ONE_HOST}
+    volumes:
+      - ./etcd/one/data:/etcd
+    entrypoint: [ "etcd" ]
+    command:
+      - --data-dir=/etcd
+      - --name=${ETCD_ONE_NAME}
+      - --advertise-client-urls=http://${ETCD_ONE_HOST}:${ETCD_ONE_CLIENT_PORT}
+      - --listen-client-urls=http://0.0.0.0:${ETCD_ONE_CLIENT_PORT}
+      - --initial-advertise-peer-urls=http://${ETCD_ONE_HOST}:${ETCD_ONE_PEER_PORT}
+      - --listen-peer-urls=http://0.0.0.0:${ETCD_ONE_PEER_PORT}
+      - --initial-cluster=${GATEWAY_ETCD_INITIAL_CLUSTER}
+      - --initial-cluster-state=${GATEWAY_ETCD_INITIAL_CLUSTER_STATE}
+      - --initial-cluster-token=${GATEWAY_ETCD_INITIAL_CLUSTER_TOKEN}
+    healthcheck:
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
+  minio-one:
+    image: minio/minio:latest
+    deploy:
+      replicas: 1
+    hostname: ${MINIO_ONE_HOST}
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ONE_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ONE_ROOT_PASSWORD}
+    volumes:
+      - ./minio/one/data:/minio
+    entrypoint: [ "minio" ]
+    command:
+      - server
+      - /minio
+      - --console-address
+      - ":${MINIO_ONE_CONSOLE_PORT}"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
+  kafka-one:
+    image: bitnami/kafka:latest
+    hostname: ${KAFKA_ONE_HOST}
+    deploy:
+      replicas: 1
+    environment:
+      - KAFKA_KRAFT_CLUSTER_ID=${GATEWAY_KAFKA_CLUSTER_ID}
+      - KAFKA_CFG_NODE_ID=${KAFKA_ONE_NODE_ID}
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_ONE_NODE_ID}@${KAFKA_ONE_HOST}:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT},CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT}
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+    volumes:
+      - ./kafka/one/data:/bitnami/kafka
+  kafka-ui-one:
+    image: provectuslabs/kafka-ui:latest
+    deploy:
+      replicas: 1
+    hostname: ${KAFKA_UI_ONE_HOST}
+    environment:
+      - DYNAMIC_CONFIG_ENABLED=true
+    volumes:
+      - ./kafka-ui/one/data:/etc/kafkaui
+  milvus-standalone:
+    image: milvusdb/milvus:latest-gpu
+    deploy:
+      replicas: 1
+    hostname: ${MILVUS_STANDALONE_HOST}
+    entrypoint: [ "milvus" ]
+    command:
+      - run
+      - standalone
+    environment:
+      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
+      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
+      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
+      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
+      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
+    volumes:
+      - ./milvus/standalone/data:/var/lib/milvus
+    depends_on:
+      - nginx-two
