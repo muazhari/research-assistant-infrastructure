@@ -17,7 +17,7 @@ services:
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
-      - ./nginx/one.template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/one/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]
@@ -48,7 +48,7 @@ services:
       replicas: 1
     volumes:
       - ./nginx/two/data:/etc/nginx
-      - ./nginx/two.template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]

@@ -12,12 +12,12 @@ services:
       - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
-      - '${GATEWAY_ETCD_CLIENT_PORT}:${GATEWAY_ETCD_CLIENT_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
+      - '${GATEWAY_SIGNOZ_FRONTEND_PORT}:${GATEWAY_SIGNOZ_FRONTEND_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
-      - ./nginx/one.template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/one/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]
@@ -37,6 +37,7 @@ services:
       - cockroach-one
       - milvus-standalone
       - nginx-two
+      - signoz-frontend
   nginx-two:
     image: nginx:latest
     hostname: ${NGINX_TWO_HOST}
@@ -44,7 +45,7 @@ services:
       replicas: 1
     volumes:
       - ./nginx/two/data:/etc/nginx
-      - ./nginx/two.template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]
@@ -207,23 +208,35 @@ services:
       - ":${MINIO_ONE_CONSOLE_PORT}"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
+  zookeeper-one:
+    image: bitnami/zookeeper:latest
+    hostname: ${ZOOKEEPER_ONE_HOST}
+    deploy:
+      replicas: 1
+    environment:
+      - ZOO_PORT_NUMBER=${ZOOKEEPER_ONE_PORT}
+      - ZOO_ENABLE_AUTH=yes
+      - ZOO_CLIENT_USER=${ZOOKEEPER_ONE_USER}
+      - ZOO_CLIENT_PASSWORD=${ZOOKEEPER_ONE_PASSWORD}
+    volumes:
+      - ./zookeeper/one/data:/bitnami/zookeeper
   kafka-one:
     image: bitnami/kafka:latest
     hostname: ${KAFKA_ONE_HOST}
     deploy:
       replicas: 1
     environment:
-      - KAFKA_KRAFT_CLUSTER_ID=${GATEWAY_KAFKA_CLUSTER_ID}
-      - KAFKA_CFG_NODE_ID=${KAFKA_ONE_NODE_ID}
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_ONE_NODE_ID}@${KAFKA_ONE_HOST}:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT},CONTROLLER://:9093
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=${ZOOKEEPER_ONE_HOST}:${ZOOKEEPER_ONE_PORT}
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT},
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT}
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_ZOOKEEPER_USER=${GATEWAY_ZOOKEEPER_USER}
+      - KAFKA_ZOOKEEPER_PASSWORD=${GATEWAY_ZOOKEEPER_PASSWORD}
     volumes:
       - ./kafka/one/data:/bitnami/kafka
+    depends_on:
+      - zookeeper-one
   kafka-ui-one:
     image: provectuslabs/kafka-ui:latest
     deploy:
@@ -233,6 +246,8 @@ services:
       - DYNAMIC_CONFIG_ENABLED=true
     volumes:
       - ./kafka-ui/one/data:/etc/kafkaui
+    depends_on:
+      - kafka-one
   milvus-standalone:
     image: milvusdb/milvus:latest-gpu
     deploy:
@@ -252,3 +267,100 @@ services:
       - ./milvus/standalone/data:/var/lib/milvus
     depends_on:
       - nginx-two
+  clickhouse-one:
+    image: clickhouse/clickhouse-server:latest
+    hostname: ${CLICKHOUSE_ONE_HOST}
+    deploy:
+      replicas: 1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${CLICKHOUSE_ONE_HTTP_PORT}/ping" ]
+    env_file:
+      - "./.env"
+    volumes:
+      - ./clickhouse/one/data:/var/lib/clickhouse
+      - ./clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml
+      #      - ./clickhouse/storage.xml:/etc/clickhouse-server/config.d/storage.xml
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml
+  signoz-query-service:
+    build:
+      context: ./signoz/query-service
+      dockerfile: ./Dockerfile
+    hostname: ${SIGNOZ_QUERY_SERVICE_HOST}
+    deploy:
+      replicas: 1
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |-
+        envsubst < /root/config/template.prometheus.yml > /root/config/prometheus.yml \
+        && \
+        ./query-service -config=/root/config/prometheus.yml
+    volumes:
+      - ./signoz/template.prometheus.yml:/root/config/template.prometheus.yml
+      - ./signoz/dashboards:/root/config/dashboards
+      - ./signoz/query-service/data:/var/lib/signoz
+    environment:
+      - ClickHouseUrl=tcp://default:${GATEWAY_CLICKHOUSE_PASSWORD}@${NGINX_TWO_HOST}:${GATEWAY_CLICKHOUSE_TCP_PORT}
+      - ALERTMANAGER_API_PREFIX=http://${SIGNOZ_ALERTMANAGER_HOST}:9093/api/
+      - SIGNOZ_LOCAL_DB_PATH=/var/lib/signoz/signoz.db
+      - DASHBOARDS_PATH=/root/config/dashboards
+      - STORAGE=clickhouse
+      - GODEBUG=netdns=go
+      - TELEMETRY_ENABLED=true
+    healthcheck:
+      test: [ "CMD","wget", "--spider", "-q","localhost:8080/api/v1/health" ]
+    depends_on:
+      - nginx-two
+  signoz-alertmanager:
+    image: signoz/alertmanager:latest
+    hostname: ${SIGNOZ_ALERTMANAGER_HOST}
+    deploy:
+      replicas: 1
+    volumes:
+      - ./signoz/alertmanager/data:/data
+    command: [ "--queryService.url=http://${SIGNOZ_QUERY_SERVICE_HOST}:8085", "--storage.path=/data" ]
+    depends_on:
+      - signoz-query-service
+  signoz-frontend:
+    image: signoz/frontend:latest
+    hostname: ${SIGNOZ_FRONTEND_HOST}
+    deploy:
+      replicas: 1
+    volumes:
+      - ./signoz/common/nginx-config.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - signoz-alertmanager
+      - signoz-query-service
+  signoz-otel-collector-migrator:
+    image: signoz/signoz-schema-migrator:main
+    hostname: ${SIGNOZ_OTEL_COLLECTOR_MIGRATOR_HOST}
+    command: [ "--dsn=tcp://default:${GATEWAY_CLICKHOUSE_PASSWORD}@${NGINX_TWO_HOST}:${GATEWAY_CLICKHOUSE_TCP_PORT}" ]
+    depends_on:
+      - nginx-two
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:latest
+    command:
+      [
+        "--config=/etc/config.yaml",
+        "--manager-config=/etc/manager-config.yaml",
+        "--copy-path=/var/tmp/collector-config.yaml",
+        "--feature-gates=-pkg.translator.prometheus.NormalizeName"
+      ]
+    volumes:
+      - ./signoz/otel-collector/config.yaml:/etc/config.yaml
+      - ./signoz/otel-collector/opamp-config.yaml:/etc/manager-config.yaml
+    depends_on:
+      - signoz-otel-collector-migrator
+      - signoz-query-service
+  #  signoz-logspout:
+  #    image: "gliderlabs/logspout:lastest"
+  #    hostname: ${SIGNOZ_LOGSPOUT_HOST}
+  #    volumes:
+  #      - /etc/hostname:/etc/host_hostname:ro
+  #      - /var/run/docker.sock:/var/run/docker.sock
+  #    command: syslog+tcp://${SIGNOZ_OTEL_COLLECTOR_HOST}:2255
+  #    depends_on:
+  #      - signoz-otel-collector
+
+
+
