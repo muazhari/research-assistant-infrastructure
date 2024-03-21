@@ -126,6 +126,21 @@ services:
   #            - driver: nvidia
   #              capabilities: [ "gpu" ]
   #              device_ids: [ "0" ]
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:latest
+    hostname: ${LANGFUSE_HOST}
+    deploy:
+      replicas: 1
+    environment:
+      - DATABASE_URL=cockroachdb://${GATEWAY_COCKROACH_USER}@${NGINX_TWO_HOST}:${GATEWAY_COCKROACH_SQL_PORT}/${GATEWAY_COCKROACH_DATABASE}
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
+      - SALT=${LANGFUSE_SALT}
+      - NEXTAUTH_URL=http://${LANGFUSE_HOST}:${LANGFUSE_PORT}
+      - TELEMETRY_ENABLED=${LANGFUSE_TELEMETRY_ENABLED}
+      - NEXT_PUBLIC_SIGN_UP_DISABLED=${LANGFUSE_NEXT_PUBLIC_SIGN_UP_DISABLED}
+      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES}
+    depends_on:
+      - nginx-two
   redis-one:
     image: redis:latest
     deploy:
