@@ -8,8 +8,10 @@ services:
       - '${GATEWAY_FRONTEND_PORT}:${GATEWAY_FRONTEND_PORT}'
       - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
       - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
+      - '${GATEWAY_REDIS_INSIGHT_PORT}:${GATEWAY_REDIS_INSIGHT_PORT}'
       - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
+      - '${GATEWAY_KAFKA_UI_PORT}:${GATEWAY_KAFKA_UI_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
@@ -125,7 +127,6 @@ services:
   #          devices:
   #            - driver: nvidia
   #              capabilities: [ "gpu" ]
-  #              device_ids: [ "0" ]
   redis-one:
     image: redis:latest
     deploy:
@@ -139,16 +140,13 @@ services:
       - ${REDIS_ONE_PORT}
       - --requirepass
       - ${REDIS_ONE_PASSWORD}
-      - --cluster-enabled yes
-      - --cluster-config-file nodes.conf
-      - --cluster-node-timeout 5000
   redis-insight-one:
     image: oblakstudio/redisinsight:latest
     deploy:
       replicas: 1
     hostname: ${REDIS_INSIGHT_ONE_HOST}
     volumes:
-      - ./redis-insight/one/data:/db
+      - ./redis-insight/one/data:/data
   cockroach-one:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -235,6 +233,11 @@ services:
     image: milvusdb/milvus:latest-gpu
     deploy:
       replicas: 1
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ "gpu" ]
     hostname: ${MILVUS_STANDALONE_HOST}
     entrypoint: [ "milvus" ]
     command:

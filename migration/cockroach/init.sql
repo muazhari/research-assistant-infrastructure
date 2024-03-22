@@ -45,8 +45,8 @@ create table document_process
     started_at          timestamptz not null,
     finished_at         timestamptz not null,
     constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id
-)
-    );
+        )
+);
 
 
 drop table if exists file_document cascade;
@@ -164,3 +164,5 @@ from file_document fd;
 select *
 from document_process dp
 where dp.id = '9bff7f89-86de-4a4f-8e41-648b7756d917';
+
+delete from account;

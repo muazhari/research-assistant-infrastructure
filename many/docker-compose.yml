@@ -8,8 +8,10 @@ services:
       - '${GATEWAY_FRONTEND_PORT}:${GATEWAY_FRONTEND_PORT}'
       - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
       - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
+      - '${GATEWAY_REDIS_INSIGHT_PORT}:${GATEWAY_REDIS_INSIGHT_PORT}'
       - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
+      - '${GATEWAY_KAFKA_UI_PORT}:${GATEWAY_KAFKA_UI_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
@@ -135,7 +137,6 @@ services:
   #          devices:
   #            - driver: nvidia
   #              capabilities: [ "gpu" ]
-  #              device_ids: [ "0" ]
   redis-one:
     image: redis:latest
     deploy:
@@ -190,7 +191,9 @@ services:
       replicas: 1
     hostname: ${REDIS_INSIGHT_ONE_HOST}
     volumes:
-      - ./redis-insight/one/data:/db
+      - ./redis-insight/one/data:/data
+    depends_on:
+      - nginx-two
   cockroach-one:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -533,7 +536,6 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
-              device_ids: [ "0" ]
     hostname: ${MILVUS_QUERY_NODE_HOST}
     entrypoint: [ "milvus" ]
     command:
@@ -558,7 +560,6 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
-              device_ids: [ "0" ]
     hostname: ${MILVUS_DATA_NODE_HOST}
     entrypoint: [ "milvus" ]
     command:
@@ -583,7 +584,6 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
-              device_ids: [ "0" ]
     hostname: ${MILVUS_INDEX_NODE_HOST}
     entrypoint: [ "milvus" ]
     command:
