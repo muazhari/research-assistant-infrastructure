@@ -13,6 +13,7 @@ services:
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
       - '${GATEWAY_KAFKA_UI_PORT}:${GATEWAY_KAFKA_UI_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
+      - '${GATEWAY_MILVUS_ATTU_PORT}:${GATEWAY_MILVUS_ATTU_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
     volumes:
@@ -253,3 +254,10 @@ services:
       - ./milvus/standalone/data:/var/lib/milvus
     depends_on:
       - nginx-two
+  milvus-attu-one:
+    image: zilliz/attu:latest
+    deploy:
+      replicas: 1
+    hostname: ${MILVUS_ATTU_ONE_HOST}
+    environment:
+      - MILVUS_URL=${MILVUS_STANDALONE_HOST}:${GATEWAY_MILVUS_PORT}
