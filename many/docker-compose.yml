@@ -123,14 +123,14 @@ services:
   #    healthcheck:
   #      test: netstat -tln | grep ${GATEWAY_FRONTEND_PORT} || exit 1
   #  backend:
-  #    image: research-assistant-backend:latest
-  #    hostname: ${GATEWAY_BACKEND_HOST}
+  #    image: muazhari/research-assistant-backend:latest
+  #    hostname: ${BACKEND_HOST}
   #    entrypoint: [ "/bin/sh", "-c" ]
   #    command:
   #      - |-
-  #        python3 run.py
+  #        python3 -m uvicorn app.main:app --host=0.0.0.0 --port=${BACKEND_PORT} --workers=1
   #    healthcheck:
-  #      test: netstat -tln | grep ${GATEWAY_BACKEND_PORT} || exit 1
+  #      test: netstat -tln | grep ${BACKEND_PORT} || exit 1
   #    deploy:
   #      replicas: 1
   #      resources:

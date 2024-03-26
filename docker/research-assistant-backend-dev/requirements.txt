@@ -1,0 +1,7 @@
+pydevd-pycharm
+jupyter
+notebook<7
+pytest
+pytest-asyncio
+pytest-xdist
+datasets
