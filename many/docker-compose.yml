@@ -151,9 +151,12 @@ services:
       - ${REDIS_ONE_PORT}
       - --requirepass
       - ${REDIS_ONE_PASSWORD}
-      - --cluster-enabled yes
-      - --cluster-config-file nodes.conf
-      - --cluster-node-timeout 5000
+      - --cluster-enabled
+      - yes
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
   redis-two:
     image: redis:latest
     deploy:
@@ -167,9 +170,12 @@ services:
       - ${REDIS_TWO_PORT}
       - --requirepass
       - ${REDIS_TWO_PASSWORD}
-      - --cluster-enabled yes
-      - --cluster-config-file nodes.conf
-      - --cluster-node-timeout 5000
+      - --cluster-enabled
+      - yes
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
   redis-three:
     image: redis:latest
     deploy:
@@ -183,9 +189,12 @@ services:
       - ${REDIS_THREE_PORT}
       - --requirepass
       - ${REDIS_THREE_PASSWORD}
-      - --cluster-enabled yes
-      - --cluster-config-file nodes.conf
-      - --cluster-node-timeout 5000
+      - --cluster-enabled
+      - yes
+      - --cluster-config-file
+      - nodes.conf
+      - --cluster-node-timeout
+      - "5000"
   redis-insight-one:
     image: oblakstudio/redisinsight:latest
     deploy:

@@ -61,22 +61,6 @@ services:
     depends_on:
       - etcd-one
       - minio-one
-  redis-init:
-    image: redis:latest
-    deploy:
-      replicas: 1
-    entrypoint: [ "redis-cli" ]
-    command:
-      - --pass
-      - ${GATEWAY_REDIS_PASSWORD}
-      - --cluster
-      - create
-      - ${REDIS_ONE_HOST}:${REDIS_ONE_PORT}
-      - --cluster-replicas
-      - "0"
-      - --cluster-yes
-    depends_on:
-      - nginx-one
   cockroach-init:
     image: cockroachdb/cockroach:latest
     deploy:

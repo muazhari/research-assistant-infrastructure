@@ -4,8 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - C:\Data\Apps\research-assistant-backend:/app
-      - file-documents:/mnt/file-documents
+      - ${APP_PATH}:/app
+      - ${CACHE_PATH}:/root/.cache
+      - ${NLTK_DATA_PATH}:/root/nltk_data
     deploy:
       resources:
         reservations:
@@ -27,21 +28,14 @@ services:
       - --allow-root
       - --ip=0.0.0.0
       - --port=${JUPYTER_PORT}
+      - --NotebookApp.token=${JUPYTER_TOKEN}
     volumes:
-      - C:\Data\Apps\research-assistant-backend:/app
-      - file-documents:/mnt/file-documents
+      - ${APP_PATH}:/app
+      - ${CACHE_PATH}:/root/.cache
+      - ${NLTK_DATA_PATH}:/root/nltk_data
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
-volumes:
-  file-documents:
-    driver: juicedata/juicefs
-    driver_opts:
-      name: file-documents
-      storage: minio
-      bucket: http://${GATEWAY_HOST}:${GATEWAY_MINIO_NODE_PORT}/research-assistant-backend.file-documents
-      access-key: ${GATEWAY_MINIO_ROOT_USER}
-      secret-key: ${GATEWAY_MINIO_ROOT_PASSWORD}
