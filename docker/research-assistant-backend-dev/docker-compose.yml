@@ -1,19 +1,47 @@
 services:
-  playground:
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "${JUPYTER_PORT}:${JUPYTER_PORT}"
-    entrypoint: [ "/bin/sh", "-c" ]
-    command:
-      - |-
-        python3 -m jupyter notebook --no-browser --allow-root --ip=0.0.0.0 --port=${JUPYTER_PORT}
     volumes:
       - C:\Data\Apps\research-assistant-backend:/app
+      - file-documents:/mnt/file-documents
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
+  playground:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${JUPYTER_PORT}:${JUPYTER_PORT}"
+    command:
+      - python3
+      - -m
+      - jupyter
+      - notebook
+      - --no-browser
+      - --allow-root
+      - --ip=0.0.0.0
+      - --port=${JUPYTER_PORT}
+    volumes:
+      - C:\Data\Apps\research-assistant-backend:/app
+      - file-documents:/mnt/file-documents
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ "gpu" ]
+volumes:
+  file-documents:
+    driver: juicedata/juicefs
+    driver_opts:
+      name: file-documents
+      storage: minio
+      bucket: http://${GATEWAY_HOST}:${GATEWAY_MINIO_NODE_PORT}/research-assistant-backend.file-documents
+      access-key: ${GATEWAY_MINIO_ROOT_USER}
+      secret-key: ${GATEWAY_MINIO_ROOT_PASSWORD}

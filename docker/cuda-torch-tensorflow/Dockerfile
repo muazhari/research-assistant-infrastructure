@@ -18,3 +18,9 @@ RUN pip3 install torch==2.2.0 torchvision torchaudio
 
 # Install tensorflow
 RUN pip3 install tensorflow[and-cuda]
+
+# Copy entrypoint.sh to image.
+COPY ./entrypoint.sh /entrypoint.sh
+
+# Set the entrypoint.
+ENTRYPOINT ["/entrypoint.sh"]
