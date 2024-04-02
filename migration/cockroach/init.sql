@@ -156,3 +156,15 @@ from file_document fd;
 select *
 from document_process dp
 where dp.id = '9bff7f89-86de-4a4f-8e41-648b7756d917';
+
+select *
+from file_document fd
+         inner join document d on fd.id = d.id
+         inner join (select a.id
+                     from account a
+                     where a.id = '0008e915-9337-4ccf-92bd-d89a95f49fca'
+                     union
+                     select s.account_id
+                     from session s
+                     where s.id = 'b8859ef0-aeb8-4263-8176-a9f69f7553ba') as a on a.id = d.account_id
+where fd.id = '00714e17-45f1-4de2-a7a9-5f138dfdb826';

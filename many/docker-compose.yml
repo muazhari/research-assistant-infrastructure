@@ -16,6 +16,7 @@ services:
       - '${GATEWAY_MILVUS_ATTU_PORT}:${GATEWAY_MILVUS_ATTU_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
+      - '${GATEWAY_INFINITY_ONE_PORT}:${GATEWAY_INFINITY_ONE_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
       - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
@@ -138,6 +139,7 @@ services:
   #          devices:
   #            - driver: nvidia
   #              capabilities: [ "gpu" ]
+  #              count: 1
   redis-one:
     image: redis:latest
     deploy:
@@ -547,6 +549,7 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
+              count: 1
     hostname: ${MILVUS_QUERY_NODE_HOST}
     entrypoint: [ "milvus" ]
     command:
@@ -571,6 +574,7 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
+              count: 1
     hostname: ${MILVUS_DATA_NODE_HOST}
     entrypoint: [ "milvus" ]
     command:
@@ -595,6 +599,7 @@ services:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
+              count: 1
     hostname: ${MILVUS_INDEX_NODE_HOST}
     entrypoint: [ "milvus" ]
     command:
@@ -617,3 +622,22 @@ services:
     hostname: ${MILVUS_ATTU_ONE_HOST}
     environment:
       - MILVUS_URL=${MILVUS_PROXY_HOST}:${GATEWAY_MILVUS_PORT}
+  infinity-one:
+    image: michaelf34/infinity:latest
+    deploy:
+      replicas: 3
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ "gpu" ]
+              count: 1
+    hostname: ${INFINITY_ONE_HOST}
+    entrypoint: [ "infinity_emb" ]
+    command:
+      - --model-name-or-path=${INFINITY_ONE_MODEL_NAME}
+      - --port=${INFINITY_ONE_PORT}
+    environment:
+      - SENTENCE_TRANSFORMERS_HOME=/root/.cache/huggingface/hub
+    volumes:
+      - ${CACHE_PATH}:/root/.cache
