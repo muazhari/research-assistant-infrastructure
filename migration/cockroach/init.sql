@@ -44,8 +44,7 @@ create table document_process
     final_document_id   uuid unique not null references document (id) on delete cascade on update cascade,
     started_at          timestamptz not null,
     finished_at         timestamptz not null,
-    constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id
-        )
+    constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id)
 );
 
 
@@ -89,9 +88,9 @@ create table text_document
 --
 -- populate all table document_types
 insert into document_type (id, description)
-values ('text', 'text description'),
-       ('file', 'file description'),
-       ('web', 'web description');
+values ('text', 'description0'),
+       ('file', 'description1'),
+       ('web', 'description2');
 --
 -- -- populate table documents and its sub tables
 -- insert into document (id, name, description, document_type_id, account_id)
@@ -146,9 +145,6 @@ from document_type;
 
 select *
 from account;
-
-select *
-from file_document fd;
 
 select *
 from file_document fd;

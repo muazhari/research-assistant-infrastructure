@@ -17,7 +17,7 @@ RUN pip3 install --upgrade pip
 RUN pip3 install torch==2.2.0 torchvision torchaudio
 
 # Install tensorflow
-RUN pip3 install tensorflow[and-cuda]
+RUN pip3 install tensorflow[and-cuda]==2.15.1
 
 # Copy entrypoint.sh to image.
 COPY ./entrypoint.sh /entrypoint.sh
