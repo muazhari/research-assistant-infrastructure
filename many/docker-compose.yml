@@ -19,7 +19,7 @@ services:
       - '${GATEWAY_INFINITY_ONE_PORT}:${GATEWAY_INFINITY_ONE_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
-      - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
+      - ./nginx/one/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
       - "./.env"
     entrypoint: [ "/bin/sh", "-c" ]
@@ -141,62 +141,33 @@ services:
   #              capabilities: [ "gpu" ]
   #              count: 1
   redis-one:
-    image: redis:latest
+    image: redis/redis-stack-server:latest
     deploy:
       replicas: 1
     hostname: ${REDIS_ONE_HOST}
     volumes:
       - ./redis/one/data:/data
-    entrypoint: [ "redis-server" ]
     command:
-      - --port
-      - ${REDIS_ONE_PORT}
-      - --requirepass
-      - ${REDIS_ONE_PASSWORD}
-      - --cluster-enabled
-      - yes
-      - --cluster-config-file
-      - nodes.conf
-      - --cluster-node-timeout
-      - "5000"
+    environment:
+      - REDIS_ARGS=--port ${REDIS_ONE_PORT} --requirepass ${REDIS_ONE_PASSWORD} --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000
   redis-two:
-    image: redis:latest
+    image: redis/redis-stack-server:latest
     deploy:
       replicas: 1
     hostname: ${REDIS_TWO_HOST}
     volumes:
       - ./redis/two/data:/data
-    entrypoint: [ "redis-server" ]
-    command:
-      - --port
-      - ${REDIS_TWO_PORT}
-      - --requirepass
-      - ${REDIS_TWO_PASSWORD}
-      - --cluster-enabled
-      - yes
-      - --cluster-config-file
-      - nodes.conf
-      - --cluster-node-timeout
-      - "5000"
+    environment:
+      - REDIS_ARGS=--port ${REDIS_TWO_PORT} --requirepass ${REDIS_TWO_PASSWORD} --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000
   redis-three:
-    image: redis:latest
+    image: redis/redis-stack-server:latest
     deploy:
       replicas: 1
     hostname: ${REDIS_THREE_HOST}
     volumes:
       - ./redis/three/data:/data
-    entrypoint: [ "redis-server" ]
-    command:
-      - --port
-      - ${REDIS_THREE_PORT}
-      - --requirepass
-      - ${REDIS_THREE_PASSWORD}
-      - --cluster-enabled
-      - yes
-      - --cluster-config-file
-      - nodes.conf
-      - --cluster-node-timeout
-      - "5000"
+    environment:
+      - REDIS_ARGS=--port ${REDIS_THREE_PORT} --requirepass ${REDIS_THREE_PASSWORD} --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000
   redis-insight-one:
     image: oblakstudio/redisinsight:latest
     deploy:
@@ -459,6 +430,13 @@ services:
     volumes:
       - ./milvus/proxy/data:/var/lib/milvus
     depends_on:
+      - milvus-root-coord
+      - milvus-query-coord
+      - milvus-data-coord
+      - milvus-index-coord
+      - milvus-query-node
+      - milvus-data-node
+      - milvus-index-node
       - nginx-two
   milvus-root-coord:
     image: milvusdb/milvus:latest-gpu

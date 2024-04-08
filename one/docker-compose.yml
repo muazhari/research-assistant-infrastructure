@@ -115,18 +115,14 @@ services:
   #              capabilities: [ "gpu" ]
   #              count: 1
   redis-one:
-    image: redis:latest
+    image: redis/redis-stack-server:latest
     deploy:
       replicas: 1
     hostname: ${REDIS_ONE_HOST}
     volumes:
       - ./redis/one/data:/data
-    entrypoint: [ "redis-server" ]
-    command:
-      - --port
-      - ${REDIS_ONE_PORT}
-      - --requirepass
-      - ${REDIS_ONE_PASSWORD}
+    environment:
+      - REDIS_ARGS=--port ${REDIS_ONE_PORT} --requirepass ${REDIS_ONE_PASSWORD}
   redis-insight-one:
     image: oblakstudio/redisinsight:latest
     deploy:
@@ -217,7 +213,7 @@ services:
     volumes:
       - ./kafka-ui/one/data:/etc/kafkaui
   milvus-standalone:
-    image: milvusdb/milvus:2.4-latest-gpu
+    image: milvusdb/milvus:latest-gpu
     deploy:
       replicas: 1
       resources:
