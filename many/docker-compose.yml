@@ -412,7 +412,7 @@ services:
     volumes:
       - ./kafka-ui/one/data:/etc/kafkaui
   milvus-proxy:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
     hostname: ${MILVUS_PROXY_HOST}
@@ -439,7 +439,7 @@ services:
       - milvus-index-node
       - nginx-two
   milvus-root-coord:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
     hostname: ${MILVUS_PROXY_HOST}
@@ -459,7 +459,7 @@ services:
     depends_on:
       - nginx-two
   milvus-query-coord:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
     hostname: ${MILVUS_QUERY_COORD_HOST}
@@ -479,7 +479,7 @@ services:
     depends_on:
       - nginx-two
   milvus-data-coord:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
     hostname: ${MILVUS_DATA_COORD_HOST}
@@ -499,7 +499,7 @@ services:
     depends_on:
       - nginx-two
   milvus-index-coord:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
     hostname: ${MILVUS_INDEX_COORD_HOST}
@@ -519,7 +519,7 @@ services:
     depends_on:
       - nginx-two
   milvus-query-node:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
       resources:
@@ -544,7 +544,7 @@ services:
     depends_on:
       - nginx-two
   milvus-data-node:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
       resources:
@@ -569,7 +569,7 @@ services:
     depends_on:
       - nginx-two
   milvus-index-node:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 3
       resources:

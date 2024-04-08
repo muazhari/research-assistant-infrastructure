@@ -213,7 +213,7 @@ services:
     volumes:
       - ./kafka-ui/one/data:/etc/kafkaui
   milvus-standalone:
-    image: milvusdb/milvus:latest-gpu
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 1
       resources:
