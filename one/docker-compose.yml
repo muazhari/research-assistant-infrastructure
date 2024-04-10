@@ -9,14 +9,12 @@ services:
       - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
       - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
       - '${GATEWAY_REDIS_INSIGHT_PORT}:${GATEWAY_REDIS_INSIGHT_PORT}'
-      - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
-      - '${GATEWAY_KAFKA_UI_PORT}:${GATEWAY_KAFKA_UI_PORT}'
+      - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
       - '${GATEWAY_MILVUS_ATTU_PORT}:${GATEWAY_MILVUS_ATTU_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
-      - '${GATEWAY_INFINITY_ONE_PORT}:${GATEWAY_INFINITY_ONE_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
       - ./nginx/one/template.nginx.conf:/etc/nginx/template.nginx.conf
@@ -35,9 +33,7 @@ services:
     depends_on:
       #      - frontend
       #      - backend
-      - redis-one
-      - cockroach-one
-      - milvus-standalone
+      - cockroach-init
       - nginx-two
   nginx-two:
     image: nginx:latest
@@ -62,6 +58,8 @@ services:
     depends_on:
       - etcd-one
       - minio-one
+      - redis-one
+      - cockroach-one
   cockroach-init:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -186,32 +184,6 @@ services:
       - ":${MINIO_ONE_CONSOLE_PORT}"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
-  kafka-one:
-    image: bitnami/kafka:latest
-    hostname: ${KAFKA_ONE_HOST}
-    deploy:
-      replicas: 1
-    environment:
-      - KAFKA_KRAFT_CLUSTER_ID=${GATEWAY_KAFKA_CLUSTER_ID}
-      - KAFKA_CFG_NODE_ID=${KAFKA_ONE_NODE_ID}
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_ONE_NODE_ID}@${KAFKA_ONE_HOST}:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT},CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT}
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-    volumes:
-      - ./kafka/one/data:/bitnami/kafka
-  kafka-ui-one:
-    image: provectuslabs/kafka-ui:latest
-    deploy:
-      replicas: 1
-    hostname: ${KAFKA_UI_ONE_HOST}
-    environment:
-      - DYNAMIC_CONFIG_ENABLED=true
-    volumes:
-      - ./kafka-ui/one/data:/etc/kafkaui
   milvus-standalone:
     image: milvusdb/milvus:2.4-latest-gpu
     deploy:
@@ -233,7 +205,6 @@ services:
       - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
       - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
       - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
     volumes:
       - ./milvus/standalone/data:/var/lib/milvus
     depends_on:

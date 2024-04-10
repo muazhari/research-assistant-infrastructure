@@ -9,14 +9,12 @@ services:
       - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
       - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
       - '${GATEWAY_REDIS_INSIGHT_PORT}:${GATEWAY_REDIS_INSIGHT_PORT}'
-      - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
-      - '${GATEWAY_KAFKA_UI_PORT}:${GATEWAY_KAFKA_UI_PORT}'
+      - '${GATEWAY_COCKROACH_SQL_PORT}:${GATEWAY_COCKROACH_SQL_PORT}'
       - '${GATEWAY_MILVUS_PORT}:${GATEWAY_MILVUS_PORT}'
       - '${GATEWAY_MILVUS_ATTU_PORT}:${GATEWAY_MILVUS_ATTU_PORT}'
       - '${GATEWAY_MINIO_NODE_PORT}:${GATEWAY_MINIO_NODE_PORT}'
       - '${GATEWAY_MINIO_CONSOLE_PORT}:${GATEWAY_MINIO_CONSOLE_PORT}'
-      - '${GATEWAY_INFINITY_ONE_PORT}:${GATEWAY_INFINITY_ONE_PORT}'
     volumes:
       - ./nginx/one/data:/etc/nginx
       - ./nginx/one/template.nginx.conf:/etc/nginx/template.nginx.conf
@@ -35,13 +33,8 @@ services:
     depends_on:
       #      - frontend
       #      - backend
-      - redis-one
-      - redis-two
-      - redis-three
-      - cockroach-one
-      - cockroach-two
-      - cockroach-three
-      - milvus-proxy
+      - cockroach-init
+      - redis-init
       - nginx-two
   nginx-two:
     image: nginx:latest
@@ -70,6 +63,12 @@ services:
       - minio-one
       - minio-two
       - minio-three
+      - cockroach-one
+      - cockroach-two
+      - cockroach-three
+      - redis-one
+      - redis-two
+      - redis-three
   redis-init:
     image: redis:latest
     deploy:
@@ -87,7 +86,7 @@ services:
       - "0"
       - --cluster-yes
     depends_on:
-      - nginx-one
+      - nginx-two
   cockroach-init:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -111,7 +110,7 @@ services:
         --database=${GATEWAY_COCKROACH_DATABASE} \
         --file=/docker-entrypoint-initdb.d/init.sql
     depends_on:
-      - nginx-one
+      - nginx-two
   #  frontend:
   #    image: research-assistant-frontend:latest
   #    deploy:
@@ -351,246 +350,29 @@ services:
       - ":${MINIO_THREE_CONSOLE_PORT}"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_THREE_CONSOLE_PORT}/minio/health/live" ]
-  kafka-one:
-    image: bitnami/kafka:latest
-    hostname: ${KAFKA_ONE_HOST}
+  milvus-standalone:
+    image: milvusdb/milvus:2.4-latest-gpu
     deploy:
       replicas: 1
-    environment:
-      - KAFKA_KRAFT_CLUSTER_ID=${GATEWAY_KAFKA_CLUSTER_ID}
-      - KAFKA_CFG_NODE_ID=${KAFKA_ONE_NODE_ID}
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_ONE_NODE_ID}@${KAFKA_ONE_HOST}:9093,${KAFKA_TWO_NODE_ID}@9093:${KAFKA_TWO_PORT},${KAFKA_THREE_NODE_ID}@${KAFKA_THREE_HOST}:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT},CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:${KAFKA_ONE_PORT}
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-    volumes:
-      - ./kafka/one/data:/bitnami/kafka
-  kafka-two:
-    image: bitnami/kafka:latest
-    hostname: ${KAFKA_TWO_HOST}
-    deploy:
-      replicas: 1
-    environment:
-      - KAFKA_KRAFT_CLUSTER_ID=${GATEWAY_KAFKA_CLUSTER_ID}
-      - KAFKA_CFG_NODE_ID=${KAFKA_TWO_NODE_ID}
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_ONE_NODE_ID}@${KAFKA_ONE_HOST}:9093,${KAFKA_TWO_NODE_ID}@9093:${KAFKA_TWO_PORT},${KAFKA_THREE_NODE_ID}@${KAFKA_THREE_HOST}:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_TWO_PORT},CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:${KAFKA_TWO_PORT}
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-    volumes:
-      - ./kafka/two/data:/bitnami/kafka
-  kafka-three:
-    image: bitnami/kafka:latest
-    hostname: ${KAFKA_THREE_HOST}
-    deploy:
-      replicas: 1
-    environment:
-      - KAFKA_KRAFT_CLUSTER_ID=${GATEWAY_KAFKA_CLUSTER_ID}
-      - KAFKA_CFG_NODE_ID=${KAFKA_THREE_NODE_ID}
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=${KAFKA_ONE_NODE_ID}@${KAFKA_ONE_HOST}:9093,${KAFKA_TWO_NODE_ID}@9093:${KAFKA_TWO_PORT},${KAFKA_THREE_NODE_ID}@${KAFKA_THREE_HOST}:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_THREE_PORT},CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://:${KAFKA_THREE_PORT}
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-    volumes:
-      - ./kafka/three/data:/bitnami/kafka
-  kafka-ui-one:
-    image: provectuslabs/kafka-ui:latest
-    deploy:
-      replicas: 1
-    hostname: ${KAFKA_UI_ONE_HOST}
-    environment:
-      - DYNAMIC_CONFIG_ENABLED=true
-    volumes:
-      - ./kafka-ui/one/data:/etc/kafkaui
-  milvus-proxy:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-    hostname: ${MILVUS_PROXY_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - proxy
-    environment:
-      - BIND_PORT=${MILVUS_PROXY_PORT}
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-    volumes:
-      - ./milvus/proxy/data:/var/lib/milvus
-    depends_on:
-      - milvus-root-coord
-      - milvus-query-coord
-      - milvus-data-coord
-      - milvus-index-coord
-      - milvus-query-node
-      - milvus-data-node
-      - milvus-index-node
-      - nginx-two
-  milvus-root-coord:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-    hostname: ${MILVUS_PROXY_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - rootcoord
-    environment:
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-      - ROOT_COORD_ENABLE_ACTIVE_STANDBY=true
-    volumes:
-      - ./milvus/root-coord/data:/var/lib/milvus
-    depends_on:
-      - nginx-two
-  milvus-query-coord:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-    hostname: ${MILVUS_QUERY_COORD_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - querycoord
-    environment:
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-      - QUERY_COORD_ENABLE_ACTIVE_STANDBY=true
-    volumes:
-      - ./milvus/query-coord/data:/var/lib/milvus
-    depends_on:
-      - nginx-two
-  milvus-data-coord:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-    hostname: ${MILVUS_DATA_COORD_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - datacoord
-    environment:
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-      - DATA_COORD_ENABLE_ACTIVE_STANDBY=true
-    volumes:
-      - ./milvus/data-coord/data:/var/lib/milvus
-    depends_on:
-      - nginx-two
-  milvus-index-coord:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-    hostname: ${MILVUS_INDEX_COORD_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - indexcoord
-    environment:
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-      - INDEX_COORD_ENABLE_ACTIVE_STANDBY=true
-    volumes:
-      - ./milvus/index-coord/data:/var/lib/milvus
-    depends_on:
-      - nginx-two
-  milvus-query-node:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
       resources:
         reservations:
           devices:
             - driver: nvidia
               capabilities: [ "gpu" ]
               count: 1
-    hostname: ${MILVUS_QUERY_NODE_HOST}
+    hostname: ${MILVUS_STANDALONE_HOST}
     entrypoint: [ "milvus" ]
     command:
       - run
-      - querynode
+      - standalone
     environment:
+      - BIND_PORT=${MILVUS_STANDALONE_PORT}
       - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
       - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
       - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
       - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
     volumes:
-      - ./milvus/query-node/data:/var/lib/milvus
-    depends_on:
-      - nginx-two
-  milvus-data-node:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [ "gpu" ]
-              count: 1
-    hostname: ${MILVUS_DATA_NODE_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - datanode
-    environment:
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-    volumes:
-      - ./milvus/data-node/data:/var/lib/milvus
-    depends_on:
-      - nginx-two
-  milvus-index-node:
-    image: milvusdb/milvus:2.4-latest-gpu
-    deploy:
-      replicas: 3
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [ "gpu" ]
-              count: 1
-    hostname: ${MILVUS_INDEX_NODE_HOST}
-    entrypoint: [ "milvus" ]
-    command:
-      - run
-      - indexnode
-    environment:
-      - ETCD_ENDPOINTS=${NGINX_TWO_HOST}:${GATEWAY_ETCD_CLIENT_PORT}
-      - MINIO_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_MINIO_NODE_PORT}
-      - MINIO_ACCESS_KEY_ID=${GATEWAY_MINIO_ROOT_USER}
-      - MINIO_SECRET_ACCESS_KEY=${GATEWAY_MINIO_ROOT_PASSWORD}
-      - KAFKA_ADDRESS=${NGINX_TWO_HOST}:${GATEWAY_KAFKA_PORT}
-    volumes:
-      - ./milvus/index-node/data:/var/lib/milvus
+      - ./milvus/standalone/data:/var/lib/milvus
     depends_on:
       - nginx-two
   milvus-attu-one:
@@ -599,7 +381,7 @@ services:
       replicas: 1
     hostname: ${MILVUS_ATTU_ONE_HOST}
     environment:
-      - MILVUS_URL=${MILVUS_PROXY_HOST}:${GATEWAY_MILVUS_PORT}
+      - MILVUS_URL=${MILVUS_STANDALONE_HOST}:${GATEWAY_MILVUS_PORT}
   infinity-one:
     image: michaelf34/infinity:latest
     deploy:
