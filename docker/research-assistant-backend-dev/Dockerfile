@@ -5,6 +5,6 @@ FROM muazhari/research-assistant-backend:latest
 COPY ./requirements.txt $WORKDIR/requirements-dev.txt
 
 # Install python dependencies from requirements.txt.
-RUN pip3 install -r requirements-dev.txt
+RUN pip3 install -r requirements-dev.txt --use-feature=fast-deps
 
 

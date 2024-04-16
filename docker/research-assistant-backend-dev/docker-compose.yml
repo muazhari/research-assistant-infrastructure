@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+        - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
       - ${APP_PATH}:/app
       - ${CACHE_PATH}:/root/.cache

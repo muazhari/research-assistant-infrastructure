@@ -71,52 +71,12 @@ create table text_document
     text_content      text             not null,
     text_content_hash text             not null
 );
---
--- -- populate all table accounts
--- insert into account (id, email, password)
--- values ('db5adc50-df69-4bd0-b4d0-e300d3ff7560', 'admin@mail.com', 'admin'),
---        ('db5adc50-df69-4bd0-b4d0-e300d3ff7561', 'user@mail.com', 'user');
---
--- -- populate all table sessions
--- insert into session (id, account_id, access_token, refresh_token, access_token_expired_at, refresh_token_expired_at)
--- values ('1256e621-11d0-4325-8350-4b64c57c5c30', 'db5adc50-df69-4bd0-b4d0-e300d3ff7560',
---         'c9948deb-784c-4705-b93b-8c2c53a31530', '2b97a983-fd30-41ec-a350-3621ffed2ce0', now()::timestamptz,
---         now()::timestamptz),
---        ('1256e621-11d0-4325-8350-4b64c57c5c31', 'db5adc50-df69-4bd0-b4d0-e300d3ff7561',
---         'c9948deb-784c-4705-b93b-8c2c53a31531', '2b97a983-fd30-41ec-a350-3621ffed2ce1', now()::timestamptz,
---         now()::timestamptz);
---
+
 -- populate all table document_types
 insert into document_type (id, description)
 values ('text', 'description0'),
        ('file', 'description1'),
        ('web', 'description2');
---
--- -- populate table documents and its sub tables
--- insert into document (id, name, description, document_type_id, account_id)
--- values ('fb5adc50-df69-4bd0-b4d0-e300d3ff7560', 'text document', 'text description',
---         'text', 'db5adc50-df69-4bd0-b4d0-e300d3ff7560'),
---        ('fb5adc50-df69-4bd0-b4d0-e300d3ff7561', 'file document', 'file description',
---         'file', 'db5adc50-df69-4bd0-b4d0-e300d3ff7560'),
---        ('fb5adc50-df69-4bd0-b4d0-e300d3ff7562', 'web document', 'web description',
---         'web', 'db5adc50-df69-4bd0-b4d0-e300d3ff7560');
---
--- insert into text_document (id, document_id, text_content, text_content_hash)
--- values ('4c3a1539-df81-4817-a224-05158ce6fd3a', 'fb5adc50-df69-4bd0-b4d0-e300d3ff7560',
---         'In publishing and graphic design, Lorem ipsum is a placeholder text commonly used to demonstrate the visual form of a documents or a typeface without relying on meaningful content. Lorem ipsum may be used as a placeholder before final copy is available. It is also used to temporarily replace text in a process called greeking, which allows designers to consider the form of a webpage or publication, without the meaning of the text influencing the design. Lorem ipsum is typically a corrupted version of De finibus bonorum et malorum, a 1st-century BC text by the Roman statesman and philosopher Cicero, with words altered, added, and removed to make it nonsensical and improper Latin. Versions of the Lorem ipsum text have been used in typesetting at least since the 1960s, when it was popularized by advertisements for Letraset transfer sheets.[1] Lorem ipsum was introduced to the digital world in the mid-1980s, when Aldus employed it in graphic and word-processing templates for its desktop publishing program PageMaker. Other popular word processors, including Pages and Microsoft Word, have since adopted Lorem ipsum,[2] as have many LaTeX packages,[3][4][5] web content managers such as Joomla! and WordPress, and CSS libraries such as Semantic UI.[6]',
---         '4ea4b8156eb7a070adcbee3ff8186b8c78de8c0d9e93d4fe6272b3d4534e4ca9');
--- insert into file_document (id, document_id, file_name, file_data_hash)
--- values ('4c3a1539-df81-4817-a224-05158ce6fd3b', 'fb5adc50-df69-4bd0-b4d0-e300d3ff7561.txt',
---         '4ea4b8156eb7a070adcbee3ff8186b8c78de8c0d9e93d4fe6272b3d4534e4ca9');
--- insert into web_document (id, document_id, web_url, web_url_hash)
--- values ('4c3a1539-df81-4817-a224-05158ce6fd3c', 'fb5adc50-df69-4bd0-b4d0-e300d3ff7562', 'https://www.google.com',
---         'ac6bb669e40e44a8d9f8f0c94dfc63734049dcf6219aac77f02edf94b9162c09');
---
--- -- populate table document_processes from web documents to file documents
--- insert into document_process (id, initial_document_id, final_document_id, started_at, finished_at)
--- values ('63624e7e-a1bd-418f-a97d-241490240f1a', 'fb5adc50-df69-4bd0-b4d0-e300d3ff7562',
---         'fb5adc50-df69-4bd0-b4d0-e300d3ff7561', now()::timestamptz, now()::timestamptz);
-
 
 -- playground
 select *
