@@ -1,12 +1,55 @@
 services:
+  frontend:
+    image: muazhari/research-assistant-frontend:latest
+    deploy:
+      replicas: 3
+    hostname: ${FRONTEND_HOST}
+    ports:
+      - '${GATEWAY_FRONTEND_PORT}:${FRONTEND_PORT}'
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - bun run build && bun run preview --host
+    healthcheck:
+      test: netstat -tln | grep ${FRONTEND_PORT} || exit 1
+    volumes:
+      - ./.env:/app/.env
+    depends_on:
+      - nginx-one
+  backend:
+    image: muazhari/research-assistant-backend:latest
+    hostname: ${BACKEND_HOST}
+    ports:
+      - '${GATEWAY_BACKEND_PORT}:${BACKEND_PORT}'
+    entrypoint: [ "python3" ]
+    command:
+      - -m
+      - uvicorn
+      - apps.main:app
+      - --host=0.0.0.0
+      - --port=${BACKEND_PORT}
+      - --workers=1
+    healthcheck:
+      test: netstat -tln | grep ${BACKEND_PORT} || exit 1
+    deploy:
+      replicas: 3
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ "gpu" ]
+              count: 1
+    volumes:
+      - ./.env:/app/.env
+      - ${CACHE_PATH}:/root/.cache
+      - ${NLTK_DATA_PATH}:/root/nltk_data
+    depends_on:
+      - nginx-one
   nginx-one:
     image: nginx:latest
     hostname: ${NGINX_ONE_HOST}
     deploy:
       replicas: 1
     ports:
-      - '${GATEWAY_FRONTEND_PORT}:${GATEWAY_FRONTEND_PORT}'
-      - '${GATEWAY_BACKEND_PORT}:${GATEWAY_BACKEND_PORT}'
       - '${GATEWAY_REDIS_PORT}:${GATEWAY_REDIS_PORT}'
       - '${GATEWAY_REDIS_INSIGHT_PORT}:${GATEWAY_REDIS_INSIGHT_PORT}'
       - '${GATEWAY_COCKROACH_HTTP_PORT}:${GATEWAY_COCKROACH_HTTP_PORT}'
@@ -19,7 +62,7 @@ services:
       - ./nginx/one/data:/etc/nginx
       - ./nginx/one/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
-      - "./.env"
+      - ".env"
     entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |-
@@ -31,8 +74,8 @@ services:
     healthcheck:
       test: service nginx status || exit 1
     depends_on:
-      #      - frontend
-      #      - backend
+      - frontend
+      - backend
       - cockroach-init
       - redis-init
       - nginx-two
@@ -45,7 +88,7 @@ services:
       - ./nginx/two/data:/etc/nginx
       - ./nginx/two/template.nginx.conf:/etc/nginx/template.nginx.conf
     env_file:
-      - "./.env"
+      - ".env"
     entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |-
@@ -111,34 +154,6 @@ services:
         --file=/docker-entrypoint-initdb.d/init.sql
     depends_on:
       - nginx-two
-  #  frontend:
-  #    image: research-assistant-frontend:latest
-  #    deploy:
-  #      replicas: 3
-  #    hostname: ${GATEWAY_FRONTEND_HOST}
-  #    entrypoint: [ "/bin/sh", "-c" ]
-  #    command:
-  #      - |-
-  #        python3 run.py
-  #    healthcheck:
-  #      test: netstat -tln | grep ${GATEWAY_FRONTEND_PORT} || exit 1
-  #  backend:
-  #    image: muazhari/research-assistant-backend:latest
-  #    hostname: ${BACKEND_HOST}
-  #    entrypoint: [ "/bin/sh", "-c" ]
-  #    command:
-  #      - |-
-  #        python3 -m uvicorn app.main:app --host=0.0.0.0 --port=${BACKEND_PORT} --workers=1
-  #    healthcheck:
-  #      test: netstat -tln | grep ${BACKEND_PORT} || exit 1
-  #    deploy:
-  #      replicas: 1
-  #      resources:
-  #        reservations:
-  #          devices:
-  #            - driver: nvidia
-  #              capabilities: [ "gpu" ]
-  #              count: 1
   redis-one:
     image: redis/redis-stack-server:latest
     deploy:

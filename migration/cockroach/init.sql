@@ -124,3 +124,10 @@ from file_document fd
                      from session s
                      where s.id = 'b8859ef0-aeb8-4263-8176-a9f69f7553ba') as a on a.id = d.account_id
 where fd.id = '00714e17-45f1-4de2-a7a9-5f138dfdb826';
+
+
+select count(id)
+from session
+group by account_id;
+
+select * from session;
