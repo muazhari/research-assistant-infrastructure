@@ -2,7 +2,7 @@ services:
   frontend:
     image: muazhari/research-assistant-frontend:latest
     deploy:
-      replicas: 1
+      replicas: 3
     hostname: ${FRONTEND_HOST}
     ports:
       - '${GATEWAY_FRONTEND_PORT}:${FRONTEND_PORT}'
@@ -20,18 +20,18 @@ services:
     hostname: ${BACKEND_HOST}
     ports:
       - '${GATEWAY_BACKEND_PORT}:${BACKEND_PORT}'
+    entrypoint: [ "python3" ]
     command:
-      - python3
       - -m
       - uvicorn
       - apps.main:app
       - --host=0.0.0.0
       - --port=${BACKEND_PORT}
-      - --workers=2
+      - --workers=1
     healthcheck:
-      test: netstat -tln | grep ${GATEWAY_BACKEND_PORT} || exit 1
+      test: netstat -tln | grep ${BACKEND_PORT} || exit 1
     deploy:
-      replicas: 1
+      replicas: 3
       resources:
         reservations:
           devices:
@@ -74,7 +74,10 @@ services:
     healthcheck:
       test: service nginx status || exit 1
     depends_on:
+      - frontend
+      - backend
       - cockroach-init
+      - redis-init
       - nginx-two
   nginx-two:
     image: nginx:latest
@@ -98,15 +101,41 @@ services:
       test: service nginx status || exit 1
     depends_on:
       - etcd-one
+      - etcd-two
+      - etcd-three
       - minio-one
-      - redis-one
+      - minio-two
+      - minio-three
       - cockroach-one
+      - cockroach-two
+      - cockroach-three
+      - redis-one
+      - redis-two
+      - redis-three
+  redis-init:
+    image: redis:latest
+    deploy:
+      replicas: 1
+    entrypoint: [ "redis-cli" ]
+    command:
+      - --pass
+      - ${GATEWAY_REDIS_PASSWORD}
+      - --cluster
+      - create
+      - ${REDIS_ONE_HOST}:${REDIS_ONE_PORT}
+      - ${REDIS_TWO_HOST}:${REDIS_TWO_PORT}
+      - ${REDIS_THREE_HOST}:${REDIS_THREE_PORT}
+      - --cluster-replicas
+      - "0"
+      - --cluster-yes
+    depends_on:
+      - nginx-two
   cockroach-init:
     image: cockroachdb/cockroach:latest
     deploy:
       replicas: 1
     volumes:
-      - "../migration/cockroach:/docker-entrypoint-initdb.d"
+      - "../../migration/cockroach:/docker-entrypoint-initdb.d"
     entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |-
@@ -132,8 +161,27 @@ services:
     hostname: ${REDIS_ONE_HOST}
     volumes:
       - ./redis/one/data:/data
+    command:
     environment:
-      - REDIS_ARGS=--port ${REDIS_ONE_PORT} --requirepass ${REDIS_ONE_PASSWORD}
+      - REDIS_ARGS=--port ${REDIS_ONE_PORT} --requirepass ${REDIS_ONE_PASSWORD} --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000
+  redis-two:
+    image: redis/redis-stack-server:latest
+    deploy:
+      replicas: 1
+    hostname: ${REDIS_TWO_HOST}
+    volumes:
+      - ./redis/two/data:/data
+    environment:
+      - REDIS_ARGS=--port ${REDIS_TWO_PORT} --requirepass ${REDIS_TWO_PASSWORD} --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000
+  redis-three:
+    image: redis/redis-stack-server:latest
+    deploy:
+      replicas: 1
+    hostname: ${REDIS_THREE_HOST}
+    volumes:
+      - ./redis/three/data:/data
+    environment:
+      - REDIS_ARGS=--port ${REDIS_THREE_PORT} --requirepass ${REDIS_THREE_PASSWORD} --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000
   redis-insight-one:
     image: oblakstudio/redisinsight:latest
     deploy:
@@ -141,6 +189,8 @@ services:
     hostname: ${REDIS_INSIGHT_ONE_HOST}
     volumes:
       - ./redis-insight/one/data:/data
+    depends_on:
+      - nginx-two
   cockroach-one:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -155,10 +205,46 @@ services:
       - --http-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_HTTP_PORT}
       - --listen-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT}
       - --sql-addr=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_SQL_PORT}
-      - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT}
+      - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT},${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT},${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
       - --insecure
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_ONE_HTTP_PORT}/health?ready=1" ]
+  cockroach-two:
+    image: cockroachdb/cockroach:latest
+    deploy:
+      replicas: 1
+    hostname: ${COCKROACH_TWO_HOST}
+    volumes:
+      - ./cockroach/two/data:/cockroach/cockroach-data
+    entrypoint: [ "cockroach" ]
+    command:
+      - start
+      - --advertise-addr=${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT}
+      - --http-addr=${COCKROACH_TWO_HOST}:${COCKROACH_TWO_HTTP_PORT}
+      - --listen-addr=${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT}
+      - --sql-addr=${COCKROACH_TWO_HOST}:${COCKROACH_TWO_SQL_PORT}
+      - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT},${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT},${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
+      - --insecure
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_TWO_HTTP_PORT}/health?ready=1" ]
+  cockroach-three:
+    image: cockroachdb/cockroach:latest
+    deploy:
+      replicas: 1
+    hostname: ${COCKROACH_THREE_HOST}
+    volumes:
+      - ./cockroach/three/data:/cockroach/cockroach-data
+    entrypoint: [ "cockroach" ]
+    command:
+      - start
+      - --advertise-addr=${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
+      - --http-addr=${COCKROACH_THREE_HOST}:${COCKROACH_THREE_HTTP_PORT}
+      - --listen-addr=${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
+      - --sql-addr=${COCKROACH_THREE_HOST}:${COCKROACH_THREE_SQL_PORT}
+      - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT},${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT},${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
+      - --insecure
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_THREE_HTTP_PORT}/health?ready=1" ]
   etcd-one:
     image: quay.io/coreos/etcd:latest
     deploy:
@@ -179,6 +265,46 @@ services:
       - --initial-cluster-token=${GATEWAY_ETCD_INITIAL_CLUSTER_TOKEN}
     healthcheck:
       test: [ "CMD", "etcdctl", "endpoint", "health" ]
+  etcd-two:
+    image: quay.io/coreos/etcd:latest
+    deploy:
+      replicas: 1
+    hostname: ${ETCD_TWO_HOST}
+    volumes:
+      - ./etcd/two/data:/etcd
+    entrypoint: [ "etcd" ]
+    command:
+      - --data-dir=/etcd
+      - --name=${ETCD_TWO_NAME}
+      - --advertise-client-urls=http://${ETCD_TWO_HOST}:${ETCD_TWO_CLIENT_PORT}
+      - --listen-client-urls=http://0.0.0.0:${ETCD_TWO_CLIENT_PORT}
+      - --initial-advertise-peer-urls=http://${ETCD_TWO_HOST}:${ETCD_TWO_PEER_PORT}
+      - --listen-peer-urls=http://0.0.0.0:${ETCD_TWO_PEER_PORT}
+      - --initial-cluster=${GATEWAY_ETCD_INITIAL_CLUSTER}
+      - --initial-cluster-state=${GATEWAY_ETCD_INITIAL_CLUSTER_STATE}
+      - --initial-cluster-token=${GATEWAY_ETCD_INITIAL_CLUSTER_TOKEN}
+    healthcheck:
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
+  etcd-three:
+    image: quay.io/coreos/etcd:latest
+    deploy:
+      replicas: 1
+    hostname: ${ETCD_THREE_HOST}
+    volumes:
+      - ./etcd/three/data:/etcdx
+    entrypoint: [ "etcd" ]
+    command:
+      - --data-dir=/etcd
+      - --name=${ETCD_THREE_NAME}
+      - --advertise-client-urls=http://${ETCD_THREE_HOST}:${ETCD_THREE_CLIENT_PORT}
+      - --listen-client-urls=http://0.0.0.0:${ETCD_THREE_CLIENT_PORT}
+      - --initial-advertise-peer-urls=http://${ETCD_THREE_HOST}:${ETCD_THREE_PEER_PORT}
+      - --listen-peer-urls=http://0.0.0.0:${ETCD_THREE_PEER_PORT}
+      - --initial-cluster=${GATEWAY_ETCD_INITIAL_CLUSTER}
+      - --initial-cluster-state=${GATEWAY_ETCD_INITIAL_CLUSTER_STATE}
+      - --initial-cluster-token=${GATEWAY_ETCD_INITIAL_CLUSTER_TOKEN}
+    healthcheck:
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
   minio-one:
     image: minio/minio:latest
     deploy:
@@ -192,11 +318,53 @@ services:
     entrypoint: [ "minio" ]
     command:
       - server
-      - /minio
+      - http://${MINIO_ONE_HOST}:${MINIO_ONE_NODE_PORT}/minio
+      - http://${MINIO_TWO_HOST}:${MINIO_TWO_NODE_PORT}/minio
+      - http://${MINIO_THREE_HOST}:${MINIO_THREE_NODE_PORT}/minio
       - --console-address
       - ":${MINIO_ONE_CONSOLE_PORT}"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
+  minio-two:
+    image: minio/minio:latest
+    deploy:
+      replicas: 1
+    hostname: ${MINIO_TWO_HOST}
+    environment:
+      - MINIO_ROOT_USER=${MINIO_TWO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_TWO_ROOT_PASSWORD}
+    volumes:
+      - ./minio/two/data:/minio
+    entrypoint: [ "minio" ]
+    command:
+      - server
+      - http://${MINIO_ONE_HOST}:${MINIO_ONE_NODE_PORT}/minio
+      - http://${MINIO_TWO_HOST}:${MINIO_TWO_NODE_PORT}/minio
+      - http://${MINIO_THREE_HOST}:${MINIO_THREE_NODE_PORT}/minio
+      - --console-address
+      - ":${MINIO_TWO_CONSOLE_PORT}"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_TWO_CONSOLE_PORT}/minio/health/live" ]
+  minio-three:
+    image: minio/minio:latest
+    deploy:
+      replicas: 1
+    hostname: ${MINIO_THREE_HOST}
+    environment:
+      - MINIO_ROOT_USER=${MINIO_THREE_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_THREE_ROOT_PASSWORD}
+    volumes:
+      - ./minio/three/data:/minio
+    entrypoint: [ "minio" ]
+    command:
+      - server
+      - http://${MINIO_ONE_HOST}:${MINIO_ONE_NODE_PORT}/minio
+      - http://${MINIO_TWO_HOST}:${MINIO_TWO_NODE_PORT}/minio
+      - http://${MINIO_THREE_HOST}:${MINIO_THREE_NODE_PORT}/minio
+      - --console-address
+      - ":${MINIO_THREE_CONSOLE_PORT}"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_THREE_CONSOLE_PORT}/minio/health/live" ]
   milvus-standalone:
     image: milvusdb/milvus:2.4-latest-gpu
     deploy:
@@ -232,7 +400,7 @@ services:
   infinity-one:
     image: michaelf34/infinity:latest
     deploy:
-      replicas: 1
+      replicas: 3
       resources:
         reservations:
           devices:
@@ -248,6 +416,3 @@ services:
       - SENTENCE_TRANSFORMERS_HOME=/root/.cache/huggingface/hub
     volumes:
       - ${CACHE_PATH}:/root/.cache
-
-
-
