@@ -75,6 +75,7 @@ services:
       test: service nginx status || exit 1
     depends_on:
       - cockroach-init
+      - milvus-standalone
       - nginx-two
   nginx-two:
     image: nginx:latest
