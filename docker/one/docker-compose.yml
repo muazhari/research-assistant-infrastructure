@@ -199,7 +199,7 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
   milvus-standalone:
-    image: milvusdb/milvus:2.4-latest-gpu
+    image: milvusdb/milvus:latest-gpu
     deploy:
       replicas: 1
       resources:
