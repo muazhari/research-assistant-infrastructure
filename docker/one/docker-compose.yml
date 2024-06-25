@@ -27,7 +27,7 @@ services:
       - apps.main:app
       - --host=0.0.0.0
       - --port=${BACKEND_PORT}
-      - --workers=2
+      - --workers=1
     healthcheck:
       test: netstat -tln | grep ${GATEWAY_BACKEND_PORT} || exit 1
     deploy:
