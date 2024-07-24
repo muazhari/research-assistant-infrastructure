@@ -1,0 +1,30 @@
+services:
+  development:
+    image: muazhari/research-assistant-backend-development:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${DASK_SCHEDULER_PORT}:${DASK_SCHEDULER_PORT}"
+      - "${DASK_DASHBOARD_PORT}:${DASK_DASHBOARD_PORT}"
+      - "${RAY_DASHBOARD_PORT}:${RAY_DASHBOARD_PORT}"
+      - "${SSH_PORT}:${SSH_PORT}"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |-
+        service ssh start \
+        && \
+        sleep infinity
+    volumes:
+      - ${APP_PATH}:/app
+      - ${CACHE_PATH}:/root/.cache
+      - ${NLTK_DATA_PATH}:/root/nltk_data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ "gpu" ]

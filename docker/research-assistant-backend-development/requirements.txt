@@ -1,6 +1,6 @@
 pydevd-pycharm
 jupyter
-notebook<7
+notebook
 pytest
 pytest-asyncio
 pytest-xdist
