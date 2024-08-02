@@ -40,8 +40,8 @@ drop table if exists document_process cascade;
 create table document_process
 (
     id                  uuid primary key,
-    initial_document_id uuid unique not null references document (id) on delete cascade on update cascade,
-    final_document_id   uuid unique not null references document (id) on delete cascade on update cascade,
+    initial_document_id uuid        not null references document (id) on delete cascade on update cascade,
+    final_document_id   uuid        not null references document (id) on delete cascade on update cascade,
     started_at          timestamptz not null,
     finished_at         timestamptz not null,
     constraint initial_and_final_document_id_different_check check (initial_document_id != final_document_id)
