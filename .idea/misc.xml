@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="research-assistant-mini" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="research-assistant-mini" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.10.12 (sftp://root@pc-3:22/usr/bin/python3)" project-jdk-type="Python SDK" />
 </project>

@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    network_mode: host
     ports:
       - "${DASK_SCHEDULER_PORT}:${DASK_SCHEDULER_PORT}"
       - "${DASK_DASHBOARD_PORT}:${DASK_DASHBOARD_PORT}"
@@ -19,7 +20,7 @@ services:
         && \
         sleep infinity
     volumes:
-      - ${APP_PATH}:/app
+      - ${BACKEND_PATH}:/workdir
       - ${CACHE_PATH}:/root/.cache
       - ${NLTK_DATA_PATH}:/root/nltk_data
     deploy:

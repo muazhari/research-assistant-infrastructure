@@ -1,6 +1,9 @@
 services:
   frontend:
     image: muazhari/research-assistant-frontend:latest
+    build:
+      context: ${FRONTEND_PATH}
+      dockerfile: Dockerfile
     deploy:
       replicas: 3
     hostname: ${FRONTEND_HOST}
@@ -12,11 +15,14 @@ services:
     healthcheck:
       test: netstat -tln | grep ${FRONTEND_PORT} || exit 1
     volumes:
-      - ./.env:/app/.env
+      - ./.env:/workdir/.env
     depends_on:
       - nginx-one
   backend:
     image: muazhari/research-assistant-backend:latest
+    build:
+      context: ${BACKEND_PATH}
+      dockerfile: Dockerfile
     hostname: ${BACKEND_HOST}
     ports:
       - '${GATEWAY_BACKEND_PORT}:${BACKEND_PORT}'
@@ -39,7 +45,7 @@ services:
               capabilities: [ "gpu" ]
               count: 1
     volumes:
-      - ./.env:/app/.env
+      - ./.env:/workdir/.env
       - ${CACHE_PATH}:/root/.cache
       - ${NLTK_DATA_PATH}:/root/nltk_data
     depends_on:
@@ -209,7 +215,7 @@ services:
       - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT},${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT},${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
       - --insecure
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_ONE_HTTP_PORT}/health?ready=1" ]
+      test: [ "CMD", "curl", "-f", "http://${COCKROACH_ONE_HOST}:${COCKROACH_ONE_HTTP_PORT}/health?ready=1" ]
   cockroach-two:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -227,7 +233,7 @@ services:
       - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT},${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT},${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
       - --insecure
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_TWO_HTTP_PORT}/health?ready=1" ]
+      test: [ "CMD", "curl", "-f", "http://${COCKROACH_TWO_HOST}:${COCKROACH_TWO_HTTP_PORT}/health?ready=1" ]
   cockroach-three:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -245,7 +251,7 @@ services:
       - --join=${COCKROACH_ONE_HOST}:${COCKROACH_ONE_NODE_PORT},${COCKROACH_TWO_HOST}:${COCKROACH_TWO_NODE_PORT},${COCKROACH_THREE_HOST}:${COCKROACH_THREE_NODE_PORT}
       - --insecure
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${COCKROACH_THREE_HTTP_PORT}/health?ready=1" ]
+      test: [ "CMD", "curl", "-f", "http://${COCKROACH_THREE_HOST}:${COCKROACH_THREE_HTTP_PORT}/health?ready=1" ]
   etcd-one:
     image: quay.io/coreos/etcd:latest
     deploy:
@@ -325,7 +331,7 @@ services:
       - --console-address
       - ":${MINIO_ONE_CONSOLE_PORT}"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://${MINIO_ONE_HOST}:${MINIO_ONE_CONSOLE_PORT}/minio/health/live" ]
   minio-two:
     image: minio/minio:latest
     deploy:
@@ -345,7 +351,7 @@ services:
       - --console-address
       - ":${MINIO_TWO_CONSOLE_PORT}"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_TWO_CONSOLE_PORT}/minio/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://${MINIO_TWO_HOST}:${MINIO_TWO_CONSOLE_PORT}/minio/health/live" ]
   minio-three:
     image: minio/minio:latest
     deploy:
@@ -365,7 +371,7 @@ services:
       - --console-address
       - ":${MINIO_THREE_CONSOLE_PORT}"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${MINIO_THREE_CONSOLE_PORT}/minio/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://${MINIO_THREE_HOST}:${MINIO_THREE_CONSOLE_PORT}/minio/health/live" ]
   milvus-standalone:
     image: milvusdb/milvus:latest-gpu
     deploy:
