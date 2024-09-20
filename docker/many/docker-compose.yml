@@ -84,6 +84,7 @@ services:
       - backend
       - cockroach-init
       - redis-init
+      - redis-insight-one
       - milvus-standalone
       - nginx-two
   nginx-two:

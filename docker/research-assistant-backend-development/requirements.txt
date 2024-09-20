@@ -5,3 +5,8 @@ pytest
 pytest-asyncio
 pytest-xdist
 pytest-cov
+ragatouille
+flash-attn
+byaldi
+transformers @ git+https://github.com/huggingface/transformers@main
+qwen-vl-utils

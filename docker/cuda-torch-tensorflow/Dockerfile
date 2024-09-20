@@ -1,16 +1,39 @@
 # Initialize base image.
-FROM nvidia/cuda:12.6.0-cudnn-devel-ubuntu24.04
+FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Update apt repositories.
-RUN apt update -y
+# Setup apt.
+ENV DEBIAN_FRONTEND=noninteractive
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
 # Install apt dependencies.
-RUN yes | DEBIAN_FRONTEND=noninteractive apt install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt update -y \
+    && \
+    yes | apt install -y \
+    software-properties-common \
+    && \
+    add-apt-repository ppa:apt-fast/stable -y \
+    && \
+    yes | apt install -y \
+    apt-fast \
+    aria2 \
+    && \
+    yes | apt-fast install -y \
     python3 \
     python3-pip
 
-# Install torch
-RUN pip3 install torch torchvision torchaudio --index-url=https://download.pytorch.org/whl/cu124 --use-feature=fast-deps --break-system-packages
-
-# Install tensorflow
-RUN pip3 install tensorflow[and-cuda] --use-feature=fast-deps --break-system-packages
+# Install pip dependencies.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system \
+    torch==2.4.1+cu124 \
+    torchvision==0.19.1+cu124 \
+    torchaudio==2.4.1+cu124 \
+    --index-url=https://download.pytorch.org/whl/cu124 \
+    --break-system-packages \
+    && \
+    uv pip install --system \
+    tensorflow[and-cuda] \
+    --break-system-packages

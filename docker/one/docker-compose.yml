@@ -83,6 +83,7 @@ services:
       - cockroach-init
       - milvus-standalone
       - nginx-two
+      - redis-insight-one
   nginx-two:
     image: nginx:latest
     hostname: ${NGINX_TWO_HOST}
@@ -148,6 +149,8 @@ services:
     hostname: ${REDIS_INSIGHT_ONE_HOST}
     volumes:
       - ./redis-insight/one/data:/data
+    depends_on:
+      - nginx-two
   cockroach-one:
     image: cockroachdb/cockroach:latest
     deploy:
@@ -167,7 +170,7 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://${COCKROACH_ONE_HOST}:${COCKROACH_ONE_HTTP_PORT}/health?ready=1" ]
   etcd-one:
-    image: quay.io/coreos/etcd:v3.5.15
+    image: quay.io/coreos/etcd:v3.5.16
     deploy:
       replicas: 1
     hostname: ${ETCD_ONE_HOST}
